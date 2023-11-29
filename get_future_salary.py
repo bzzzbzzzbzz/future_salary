@@ -1,22 +1,21 @@
 import os
 from dotenv import load_dotenv
-from predict_salery_funcs import predict_rub_salary_superjob, add_response_to_list, predict_rub_salary_hh
+from predict_salery_funcs import predict_rub_salary_superjob, predict_rub_salary_hh
 from terminaltables import AsciiTable
 import requests
 
 PROG_LANGS = ['Python', 'Javascript', 'PHP', 'Go', 'C++']
 
 
-def get_vacancies_hh():
-    table_data = [['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата']]
+def parse_vacancies_hh():
+    vacancies_info = [['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата']]
 
     for lang in PROG_LANGS:
         url = 'https://api.hh.ru/vacancies'
-        final_dict = {}
         number_of_days = 30
         page = 0
         pages_number = 1
-        pages_data = []
+        all_pages = []
         city = 1
         searching_text = f'Программист {lang}'
         while page < pages_number:
@@ -26,42 +25,38 @@ def get_vacancies_hh():
                        'period': number_of_days}
             page_response = requests.get(url, params=payload)
             page_response.raise_for_status()
-            page_data = page_response.json()
-            pages_data.append(page_data)
-            pages_number = page_data['pages']
+            one_page = page_response.json()
+            all_pages.append(one_page)
+            pages_number = one_page['pages']
             page += 1
 
-        vacancies_processed = 0
-        empty_list = []
+        all_salaries = []
 
-        for page in pages_data:
+        for page in all_pages:
             vacancies = page['items']
             for vacancy in vacancies:
-                if predict_rub_salary_hh(vacancy):
-                    vacancies_processed += 1
-                    empty_list.append(predict_rub_salary_hh(vacancy))
+                salary = predict_rub_salary_hh(vacancy)
+                if salary:
+                    all_salaries.append(salary)
 
         vacancies_found = page['found']
         try:
-            average_salary = sum(empty_list) / len(empty_list)
+            average_salary = sum(all_salaries) / len(all_salaries)
         except ZeroDivisionError:
-            print(f'No vacancies for {lang}')
-            continue
-        final_dict[lang] = {'vacancies_processed': vacancies_processed,
-                            'vacancies_found': vacancies_found,
-                            'average_salary': int(average_salary)}
-        table_data.append([
+            average_salary = 0
+        vacancies_processed = len(all_salaries)
+        vacancies_info.append([
             f'Программист {lang}',
             vacancies_found,
             vacancies_processed,
             int(average_salary),
         ])
 
-    return table_data
+    return vacancies_info
 
 
-def get_vacancies_ss(url, headers):
-    table_data = [['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата']]
+def parse_vacancies_ss(url, headers):
+    vacancies_info = [['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата']]
 
     for lang in PROG_LANGS:
         keyword = f'Программист {lang}'
@@ -70,58 +65,57 @@ def get_vacancies_ss(url, headers):
         period = 0
         page = 0
         pages_number = 1
-        pages_data = []
-        final_dict = {}
+        all_pages = []
         while page < pages_number:
-            params = {'keyword': keyword,
-                      'town': city_id,
-                      'catalogues': catalogue_id,
-                      'page': page,
-                      'period': period}
+            payload = {'keyword': keyword,
+                       'town': city_id,
+                       'catalogues': catalogue_id,
+                       'page': page,
+                       'period': period}
 
-            add_response_to_list(url, params, pages_data, headers)
-            pages = [p['total'] for p in pages_data]
-            pages_number = pages[0] // 20
+            page_response = requests.get(url, params=payload, headers=headers)
+            page_response.raise_for_status()
+            one_page = page_response.json()
+            all_pages.append(one_page)
+            pages = one_page['total']
+            pages_number = pages // 20
             page += 1
 
-        vacancies_found = [p['total'] for p in pages_data][0]
-        vacancies_processed = 0
-        empty_list = []
-        for page in pages_data:
+        vacancies_found = all_pages[0]['total']
+        all_salaries = []
+        for page in all_pages:
             vacancies = page['objects']
             for vacancy in vacancies:
-                if predict_rub_salary_superjob(vacancy):
-                    empty_list.append(predict_rub_salary_superjob(vacancy))
-                    vacancies_processed += 1
+                salary = predict_rub_salary_superjob(vacancy)
+                if salary:
+                    all_salaries.append(salary)
+
         try:
-            average_salary = sum(empty_list) / len(empty_list)
+            average_salary = sum(all_salaries) / len(all_salaries)
         except ZeroDivisionError:
-            print(f'No vacancies for {lang}')
-            continue
-        final_dict[f'Программист {lang}'] = {'vacancies_processed': vacancies_processed,
-                                             'vacancies_found': vacancies_found,
-                                             'average_salary': int(average_salary)}
-        table_data.append([
+            average_salary = 0
+        vacancies_processed = len(all_salaries)
+        vacancies_info.append([
             f'Программист {lang}',
             vacancies_found,
             vacancies_processed,
             int(average_salary),
         ])
-    return table_data
+    return vacancies_info
 
 
 if __name__ == '__main__':
     load_dotenv()
     url_ss = 'https://api.superjob.ru/2.0/vacancies/'
-    headers_ss = {'X-Api-App-Id': os.environ['SECRET_KEY']}
-    table_data_ss = get_vacancies_ss(url_ss, headers_ss)
-    table_ss = AsciiTable(table_data_ss)
-    table_ss.title = 'SuperJob Moscow'
-    table_ss.justify_columns[3] = 'right'
+    headers_ss = {'X-Api-App-Id': os.environ['SS_SECRETKEY']}
+    ss_vacancies = parse_vacancies_ss(url_ss, headers_ss)
+    ss_table = AsciiTable(ss_vacancies)
+    ss_table.title = 'SuperJob Moscow'
+    ss_table.justify_columns[3] = 'right'
 
-    table_data_hh = get_vacancies_hh()
-    table_hh = AsciiTable(table_data_hh)
-    table_hh.title = 'HeadHunter Moscow'
-    table_hh.justify_columns[3] = 'right'
-    print(table_ss.table)
-    print(table_hh.table)
+    hh_vacancies = parse_vacancies_hh()
+    hh_table = AsciiTable(hh_vacancies)
+    hh_table.title = 'HeadHunter Moscow'
+    hh_table.justify_columns[3] = 'right'
+    print(ss_table.table)
+    print(hh_table.table)

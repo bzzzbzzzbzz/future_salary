@@ -33,8 +33,3 @@ def predict_rub_salary_superjob(vacancy):
     return None
 
 
-def add_response_to_list(url, payload, list_nums, headers=None):
-    response = requests.get(url, params=payload, headers=headers)
-    response.raise_for_status()
-    page_data = response.json()
-    list_nums.append(page_data)
