@@ -8,7 +8,7 @@ PROG_LANGS = ['Python', 'Javascript', 'PHP', 'Go', 'C++']
 
 
 def parse_vacancies_hh():
-    vacancies_info = [['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата']]
+    vacancies_pre_table = [['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата']]
 
     for lang in PROG_LANGS:
         url = 'https://api.hh.ru/vacancies'
@@ -45,18 +45,18 @@ def parse_vacancies_hh():
         except ZeroDivisionError:
             average_salary = 0
         vacancies_processed = len(all_salaries)
-        vacancies_info.append([
+        vacancies_pre_table.append([
             f'Программист {lang}',
             vacancies_found,
             vacancies_processed,
             int(average_salary),
         ])
 
-    return vacancies_info
+    return vacancies_pre_table
 
 
 def parse_vacancies_ss(url, headers):
-    vacancies_info = [['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата']]
+    vacancies_pre_table = [['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата']]
 
     for lang in PROG_LANGS:
         keyword = f'Программист {lang}'
@@ -66,6 +66,7 @@ def parse_vacancies_ss(url, headers):
         page = 0
         pages_number = 1
         all_pages = []
+        vacancies_per_page = 20
         while page < pages_number:
             payload = {'keyword': keyword,
                        'town': city_id,
@@ -77,8 +78,8 @@ def parse_vacancies_ss(url, headers):
             page_response.raise_for_status()
             one_page = page_response.json()
             all_pages.append(one_page)
-            pages = one_page['total']
-            pages_number = pages // 20
+            number_of_vacancies = one_page['total']
+            pages_number = number_of_vacancies // vacancies_per_page
             page += 1
 
         vacancies_found = all_pages[0]['total']
@@ -95,13 +96,13 @@ def parse_vacancies_ss(url, headers):
         except ZeroDivisionError:
             average_salary = 0
         vacancies_processed = len(all_salaries)
-        vacancies_info.append([
+        vacancies_pre_table.append([
             f'Программист {lang}',
             vacancies_found,
             vacancies_processed,
             int(average_salary),
         ])
-    return vacancies_info
+    return vacancies_pre_table
 
 
 if __name__ == '__main__':
